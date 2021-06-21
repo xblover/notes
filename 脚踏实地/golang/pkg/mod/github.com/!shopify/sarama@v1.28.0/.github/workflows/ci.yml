@@ -1,0 +1,44 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Go ${{ matrix.go-version }} with Kafka ${{ matrix.kafka-version }} on Ubuntu
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.15.x]
+        kafka-version: [2.6.1, 2.7.0]
+        platform: [ubuntu-latest]
+
+    env:
+      DEBUG: true
+      KAFKA_VERSION: ${{ matrix.kafka-version }}
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - uses: actions/cache@v2
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.35.2
+        export REPOSITORY_ROOT=${GITHUB_WORKSPACE}
+
+    - name: Run test suite
+      run: make test_functional
+
+    - name: Run linter
+      run: make lint
